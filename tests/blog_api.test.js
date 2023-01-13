@@ -5,12 +5,13 @@ const app = require('../app')
 const api = supertest(app)
 
 const Blog = require('../models/blog')
-const blog = require('../models/blog')
+const User = require('../models/user')
 
 beforeEach(async () => {
-  await Blog.deleteMany({})
+    await Blog.deleteMany({})
+    await Blog.insertMany(helper.initialBlogs)
 
-  await Blog.insertMany(helper.initialBlogs)
+    await User.deleteMany({})
 })
 
 test('blogs are returned as json, and are returned in the right amount', async () => {
@@ -107,4 +108,51 @@ test('update first blog', async() => {
     const titles = blogsAfter.map(blog => blog.title)
     expect(titles).not.toContain(firstBlog.title)
     expect(titles).toContain(newBlog.title)
+})
+
+test('post user successful', async() => {
+    const newUser = {
+        "username": "duyvip6a4",
+        "password": "duyvip6a4",
+        "name": "duyvip6a4"
+    }
+
+    const response = await api.post('/api/users/').send(newUser)
+
+    expect(response.body.username).toBe(newUser.username)
+    expect(response.body.name).toBe(newUser.name)
+})
+
+test('post invalid user', async() => {
+    let newUser = {
+        "username": "duyvip6a4",
+        "password": "duyvip6a4",
+        "name": "duyvip6a4"
+    }
+
+    await api.post('/api/users/').send(newUser)
+
+    // non-unique username
+    await api.post('/api/users/').send(newUser).expect(400)
+
+    // invalid password
+    newUser = {
+        "username": "thanh",
+        "password": "",
+        "name": "duyvip6a4"
+    }
+    await api.post('/api/users/').send(newUser).expect(400)
+
+    // invalid username
+    newUser = {
+        "username": "d",
+        "password": "duyvip6a4",
+        "name": "duyvip6a4"
+    }
+    await api.post('/api/users/').send(newUser).expect(400)
+})
+
+
+afterAll(() => {
+    mongoose.connection.close()
 })
