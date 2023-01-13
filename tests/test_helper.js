@@ -28,6 +28,8 @@ const initialUsers = [
   },
 ]
 
+const initialLen = Math.min(initialBlogs.length, initialUsers.length)
+
 const randomBlog = {
     title: "willremovethissoon",
     author: "willremovethissoon",
@@ -49,5 +51,5 @@ const blogsInDb = async () => {
 }
 
 module.exports = {
-  initialBlogs, initialUsers, nonExistingId, blogsInDb, randomBlog
+  initialBlogs, initialUsers, initialLen, nonExistingId, blogsInDb, randomBlog
 }

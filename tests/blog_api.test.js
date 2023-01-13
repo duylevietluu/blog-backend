@@ -9,9 +9,26 @@ const User = require('../models/user')
 
 beforeEach(async () => {
     await Blog.deleteMany({})
-    await Blog.insertMany(helper.initialBlogs)
-
     await User.deleteMany({})
+
+    // each user are inserted and post 1 blog 
+    for (let i = 0; i < helper.initialLen; ++i) {
+        // register user
+        await api.post("/api/users").send(helper.initialUsers[i])
+
+        // get token from user
+        const response = await api.post("/api/login").send(helper.initialUsers[i])
+        const token = response.body.token
+
+        helper.initialBlogs[i].token = token
+        helper.initialUsers[i].token = token
+
+        // post a blog
+        await api
+            .post('/api/blogs')
+            .send(helper.initialBlogs[i])
+            .set('Authorization', 'bearer ' + token)
+    }
 })
 
 test('blogs are returned as json, and are returned in the right amount', async () => {
@@ -21,7 +38,7 @@ test('blogs are returned as json, and are returned in the right amount', async (
         .expect('Content-Type', /application\/json/)
 
     const response = await api.get('/api/blogs')
-    expect(response.body).toHaveLength(helper.initialBlogs.length)
+    expect(response.body).toHaveLength(helper.initialLen)
 })
 
 test('all blogs have defined ids', async() => {
@@ -33,15 +50,17 @@ test('all blogs have defined ids', async() => {
 
 test('can add 1 blog to database', async() => {
     const newBlog = helper.randomBlog
+    const token = helper.initialUsers[0].token
 
     await api
         .post("/api/blogs")
         .send(newBlog)
+        .set('Authorization', 'bearer ' + token)
         .expect(201)
         .expect('Content-Type', /application\/json/)
 
     const blogsAfter = await helper.blogsInDb()
-    expect(blogsAfter).toHaveLength(1 + helper.initialBlogs.length)
+    expect(blogsAfter).toHaveLength(1 + helper.initialLen)
 
     const titles = blogsAfter.map(n => n.title)
     expect(titles).toContain(
@@ -51,10 +70,12 @@ test('can add 1 blog to database', async() => {
 
 test('blog without likes defaults to 0 likes', async() => {
     const newBlog = {title: "63c021600dc6417d6b3983b1",author: "63c021760dc6417d6b3983b4",url: "63c02523822d884d71704537"}
+    const token = helper.initialUsers[0].token
 
     // no error
     await api
         .post("/api/blogs")
+        .set('Authorization', 'bearer ' + token)
         .send(newBlog)
         .expect(201)
         .expect('Content-Type', /application\/json/)
@@ -66,10 +87,13 @@ test('blog without likes defaults to 0 likes', async() => {
 })
 
 test('cannot save blog without title or url', async() => {
+    const token = helper.initialUsers[0].token
+
     // without url
     let newBlog = {title: "63c021600dc6417d6b3983b1",author: "63c021760dc6417d6b3983b4"}
     await api
         .post('/api/blogs')
+        .set('Authorization', 'bearer ' + token)
         .send(newBlog)
         .expect(400)
 
@@ -77,6 +101,7 @@ test('cannot save blog without title or url', async() => {
     newBlog = {url: "63c021600dc6417d6b3983b1",author: "63c021760dc6417d6b3983b4"}
     await api
         .post('/api/blogs')
+        .set('Authorization', 'bearer ' + token)
         .send(newBlog)
         .expect(400)
 })
@@ -84,11 +109,15 @@ test('cannot save blog without title or url', async() => {
 test('delete first blog', async() => {
     const blogsBefore = await helper.blogsInDb()
     const firstBlog = blogsBefore[0]
+    const token = helper.initialUsers[0].token
 
-    await api.delete(`/api/blogs/${firstBlog.id}`).expect(204)
+    await api
+        .delete(`/api/blogs/${firstBlog.id}`)
+        .set('Authorization', 'bearer ' + token)
+        .expect(204)
 
     const blogsAfter = await helper.blogsInDb()
-    expect(blogsAfter).toHaveLength(helper.initialBlogs.length - 1)
+    expect(blogsAfter).toHaveLength(helper.initialLen - 1)
 
     const ids = blogsAfter.map(blog => blog.id)
     expect(ids).not.toContain(firstBlog.id)
@@ -102,7 +131,7 @@ test('update first blog', async() => {
     const newBlog = response.body
 
     const blogsAfter = await helper.blogsInDb()
-    expect(blogsAfter).toHaveLength(helper.initialBlogs.length)
+    expect(blogsAfter).toHaveLength(helper.initialLen)
     expect(newBlog.id).toBe(firstBlog.id)
 
     const titles = blogsAfter.map(blog => blog.title)
@@ -110,10 +139,11 @@ test('update first blog', async() => {
     expect(titles).toContain(newBlog.title)
 })
 
+
 test('post user successful', async() => {
     const newUser = {
-        "username": "duyvip6a4",
-        "password": "duyvip6a4",
+        "username": "48538758347959435987",
+        "password": "53578392457834785378",
         "name": "duyvip6a4"
     }
 
@@ -124,19 +154,11 @@ test('post user successful', async() => {
 })
 
 test('post invalid user', async() => {
-    let newUser = {
-        "username": "duyvip6a4",
-        "password": "duyvip6a4",
-        "name": "duyvip6a4"
-    }
-
-    await api.post('/api/users/').send(newUser)
-
     // non-unique username
-    await api.post('/api/users/').send(newUser).expect(400)
+    await api.post('/api/users/').send(helper.initialUsers[0]).expect(400)
 
     // invalid password
-    newUser = {
+    let newUser = {
         "username": "thanh",
         "password": "",
         "name": "duyvip6a4"
